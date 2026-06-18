@@ -1,0 +1,57 @@
+﻿[
+    {
+        "run":  1,
+        "elapsed_ms":  156188,
+        "objects_by_pack":  76863,
+        "objects_by_callback":  76863,
+        "signature":  "5b1a0dc73eee95106ee30604c51c08027430c4ca",
+        "pack_path":  "E:\\Programme\\NJU\\Rust\\rk8s\\.git\\objects\\pack\\pack-5b1a0dc73eee95106ee30604c51c08027430c4ca.pack",
+        "rk8s_commit":  "18169f282",
+        "threads":  2,
+        "mem_limit_mb":  512
+    },
+    {
+        "run":  2,
+        "elapsed_ms":  171467,
+        "objects_by_pack":  76863,
+        "objects_by_callback":  76863,
+        "signature":  "5b1a0dc73eee95106ee30604c51c08027430c4ca",
+        "pack_path":  "E:\\Programme\\NJU\\Rust\\rk8s\\.git\\objects\\pack\\pack-5b1a0dc73eee95106ee30604c51c08027430c4ca.pack",
+        "rk8s_commit":  "18169f282",
+        "threads":  2,
+        "mem_limit_mb":  512
+    },
+    {
+        "run":  3,
+        "elapsed_ms":  168594,
+        "objects_by_pack":  76863,
+        "objects_by_callback":  76863,
+        "signature":  "5b1a0dc73eee95106ee30604c51c08027430c4ca",
+        "pack_path":  "E:\\Programme\\NJU\\Rust\\rk8s\\.git\\objects\\pack\\pack-5b1a0dc73eee95106ee30604c51c08027430c4ca.pack",
+        "rk8s_commit":  "18169f282",
+        "threads":  2,
+        "mem_limit_mb":  512
+    },
+    {
+        "run":  4,
+        "elapsed_ms":  165053,
+        "objects_by_pack":  76863,
+        "objects_by_callback":  76863,
+        "signature":  "5b1a0dc73eee95106ee30604c51c08027430c4ca",
+        "pack_path":  "E:\\Programme\\NJU\\Rust\\rk8s\\.git\\objects\\pack\\pack-5b1a0dc73eee95106ee30604c51c08027430c4ca.pack",
+        "rk8s_commit":  "18169f282",
+        "threads":  2,
+        "mem_limit_mb":  512
+    },
+    {
+        "run":  5,
+        "elapsed_ms":  167535,
+        "objects_by_pack":  76863,
+        "objects_by_callback":  76863,
+        "signature":  "5b1a0dc73eee95106ee30604c51c08027430c4ca",
+        "pack_path":  "E:\\Programme\\NJU\\Rust\\rk8s\\.git\\objects\\pack\\pack-5b1a0dc73eee95106ee30604c51c08027430c4ca.pack",
+        "rk8s_commit":  "18169f282",
+        "threads":  2,
+        "mem_limit_mb":  512
+    }
+]

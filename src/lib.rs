@@ -30,6 +30,9 @@
 //! Test Data
 //! - Located under `tests/data/`, includes real pack files and object sets.
 
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 mod delta;
 pub mod diff;
 pub mod errors;
