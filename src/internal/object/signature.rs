@@ -132,16 +132,17 @@ impl Signature {
             let email_start = sign.find_byte(0x3C).unwrap();
             let email_end = sign.find_byte(0x3E).unwrap();
 
-            unsafe {
-                (
-                    sign[name_start + 1..email_start - 1]
-                        .to_str_unchecked()
-                        .to_string(),
-                    sign[email_start + 1..email_end]
-                        .to_str_unchecked()
-                        .to_string(),
-                )
-            }
+            let name = std::str::from_utf8(&sign[name_start + 1..email_start - 1])
+                .map_err(|e| {
+                    GitError::InvalidObjectInfo(format!("Invalid signature name utf-8: {e}"))
+                })?
+                .to_string();
+            let email = std::str::from_utf8(&sign[email_start + 1..email_end])
+                .map_err(|e| {
+                    GitError::InvalidObjectInfo(format!("Invalid signature email utf-8: {e}"))
+                })?
+                .to_string();
+            (name, email)
         };
 
         // Update the data vector to remove the author and email bytes.
@@ -152,16 +153,22 @@ impl Signature {
 
         // Parse the timestamp integer from the bytes up to the second space byte.
         // If the parsing fails, unwrap will panic.
-        let timestamp = unsafe {
-            sign[0..timestamp_split]
-                .to_str_unchecked()
-                .parse::<usize>()
-                .unwrap()
-        };
+        let timestamp = std::str::from_utf8(&sign[0..timestamp_split])
+            .map_err(|e| {
+                GitError::InvalidObjectInfo(format!("Invalid signature timestamp utf-8: {e}"))
+            })?
+            .parse::<usize>()
+            .map_err(|e| {
+                GitError::InvalidObjectInfo(format!("Invalid signature timestamp: {e}"))
+            })?;
 
         // Parse the timezone string from the bytes after the second space byte.
         // If the parsing fails, unwrap will panic.
-        let timezone = unsafe { sign[timestamp_split + 1..].to_str_unchecked().to_string() };
+        let timezone = std::str::from_utf8(&sign[timestamp_split + 1..])
+            .map_err(|e| {
+                GitError::InvalidObjectInfo(format!("Invalid signature timezone utf-8: {e}"))
+            })?
+            .to_string();
 
         // Return a Result object indicating success
         Ok(Signature {

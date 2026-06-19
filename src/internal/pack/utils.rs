@@ -319,13 +319,13 @@ mod tests {
     #[test]
     fn test_calc_obj_hash() {
         let _guard = set_hash_kind_for_test(HashKind::Sha1);
-        let hash = calculate_object_hash(ObjectType::Blob, &b"a".to_vec());
+        let hash = calculate_object_hash(ObjectType::Blob, b"a".as_ref());
         assert_eq!(hash.to_string(), "2e65efe2a145dda7ee51d1741299f848e5bf752e");
     }
     #[test]
     fn test_calc_obj_hash_sha256() {
         let _guard = set_hash_kind_for_test(HashKind::Sha256);
-        let hash = calculate_object_hash(ObjectType::Blob, &b"a".to_vec());
+        let hash = calculate_object_hash(ObjectType::Blob, b"a".as_ref());
         assert_eq!(
             hash.to_string(),
             "eb337bcee2061c5313c9a1392116b6c76039e9e30d71467ae359b36277e17dc7"

@@ -540,7 +540,7 @@ async fn upload_pack(
     }
 
     // upload-pack returns a stream (pack data) so we stream it back to the client.
-    match handler.handle_upload_pack(&request_path, &body).await {
+    match handler.handle_upload_pack(&request_path, body).await {
         Ok((stream, content_type)) => {
             let body = Body::from_stream(stream);
             ([(axum::http::header::CONTENT_TYPE, content_type)], body).into_response()

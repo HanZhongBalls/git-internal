@@ -519,7 +519,7 @@ async fn main() {
         "git-upload-pack" => {
             // Read request until "done" or flush to avoid blocking.
             let request = read_upload_pack_request().await.unwrap();
-            handler.handle_upload_pack(&request).await.unwrap()
+            handler.handle_upload_pack(request).await.unwrap()
         }
         "git-receive-pack" => {
             // Stream pack data directly from stdin.

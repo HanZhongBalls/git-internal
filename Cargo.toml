@@ -48,7 +48,6 @@ sha2 = "0.10.9"
 crc32fast = "1.5.0"
 ring = "0.17.14"
 serde_json = "1.0.149"
-zstd-sys = { version = "2.0.16", features = ["experimental"] }
 sea-orm = { version = "1.1.19", features = ["sqlx-sqlite"] }
 flate2 = { version = "1.1.9", features = ["zlib-ng"] }
 serde = { version = "1.0.228", features = ["derive"] }
@@ -58,6 +57,7 @@ tokio = { version = "1.50.0", features = ["fs", "io-util"] }
 rkyv = { version = "0.8.15", features = ["bytecheck"] }
 axum = { version = "0.8.8", features = ["macros", "json"] }
 mimalloc = { version = "0.1", features = ["local_dynamic_tls"] }
+zstd = { version = "0.13.3", features = ["experimental"] }
 
 [dev-dependencies]
 tokio = { version = "1.50.0", features = ["full"] }
@@ -70,4 +70,3 @@ ureq = "3"
 [features]
 default = ["diff_mydrs"]
 diff_mydrs = []
-bench_cache_stats = []
