@@ -7,12 +7,7 @@ use std::{
     path::Path,
 };
 
-use sha1::{Digest, Sha1};
-
-use crate::{
-    hash::{ObjectHash, get_hash_kind},
-    internal::object::types::ObjectType,
-};
+use crate::{hash::ObjectHash, internal::object::types::ObjectType};
 
 /// Checks if the reader has reached EOF (end of file).
 ///
@@ -263,42 +258,11 @@ pub fn read_delta_object_size<R: Read>(stream: &mut R) -> io::Result<(usize, usi
     Ok((base_size, result_size))
 }
 
-/// Calculate the SHA1 hash of the given object.
+/// Calculate the object hash of the given loose-object content.
 /// <br> "`<type> <size>\0<content>`"
 /// <br> data: The decompressed content of the object
 pub fn calculate_object_hash(obj_type: ObjectType, data: &[u8]) -> ObjectHash {
-    let type_bytes = obj_type
-        .to_bytes()
-        .expect("calculate_object_hash called with a delta type that has no loose-object header");
-    match get_hash_kind() {
-        crate::hash::HashKind::Sha1 => {
-            let mut hash = Sha1::new();
-            // Header: "<type> <size>\0"
-            hash.update(type_bytes);
-            hash.update(b" ");
-            hash.update(data.len().to_string());
-            hash.update(b"\0");
-
-            // Decompressed data(raw content)
-            hash.update(data);
-
-            let re: [u8; 20] = hash.finalize().into();
-            ObjectHash::Sha1(re)
-        }
-        crate::hash::HashKind::Sha256 => {
-            let mut hash = sha2::Sha256::new();
-            // Header: "<type> <size>\0"
-            hash.update(type_bytes);
-            hash.update(b" ");
-            hash.update(data.len().to_string());
-            hash.update(b"\0");
-
-            // Decompressed data(raw content)
-            hash.update(data);
-            let re: [u8; 32] = hash.finalize().into();
-            ObjectHash::Sha256(re)
-        }
-    }
+    ObjectHash::from_type_and_data(obj_type, data)
 }
 /// Create an empty directory or clear the existing directory.
 pub fn create_empty_dir<P: AsRef<Path>>(path: P) -> io::Result<()> {

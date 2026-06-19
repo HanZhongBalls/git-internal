@@ -6,6 +6,7 @@ param(
     [int]$MemLimitMB,
     [long]$Mem = 2147483648,
     [switch]$Hash,
+    [switch]$CacheStats,
     [string]$PackPath,
     [string]$BaselineRef = "5747f2c",
     [string]$TargetRef = "HEAD",
@@ -191,7 +192,8 @@ function Invoke-BenchmarkForRef {
         [string]$Config,
         [int]$ThreadsArg,
         [long]$MemArg,
-        [bool]$EnableHash
+        [bool]$EnableHash,
+        [bool]$EnableCacheStats
     )
 
     $isHead = ($Ref -eq "HEAD")
@@ -221,11 +223,11 @@ function Invoke-BenchmarkForRef {
 
     $hasBenchCacheStats = Test-HasFeatureFlag -ProjectRoot $root -FeatureName "bench_cache_stats"
     $featureArgs = @()
-    if ($hasBenchCacheStats) {
+    if ($EnableCacheStats -and $hasBenchCacheStats) {
         $featureArgs = @("--features", "bench_cache_stats")
     }
 
-    Write-Host "[build] ref=$Ref bench_cache_stats=$hasBenchCacheStats"
+    Write-Host "[build] ref=$Ref bench_cache_stats=$($EnableCacheStats -and $hasBenchCacheStats)"
     try {
         $buildArgs = @("build", "--example", "decode_pack_bench") + $featureArgs + @("--profile", $Config)
         Invoke-CargoCommand -WorkingDirectory $root -Arguments $buildArgs | Out-Host
@@ -271,6 +273,7 @@ Write-Host "  runs      : $Runs"
 Write-Host "  threads   : $Threads"
 Write-Host "  mem bytes : $resolvedMem"
 Write-Host "  hash      : $Hash"
+Write-Host "  cache stat: $CacheStats"
 Write-Host "  mode      : ABBA per round"
 
 if ($headRef -ne "" -and $headRef -ne $BaselineRef -and $TargetRef -eq "HEAD") {
@@ -286,7 +289,7 @@ try {
             $ref = if ($label -eq "baseline") { $BaselineRef } else { $TargetRef }
 
             Write-Host "[run] round=$i phase=$phase label=$label ref=$ref"
-            $res = Invoke-BenchmarkForRef -Ref $ref -Pack $pack -WorktreeRoot $tmpWorktreeRoot -ActiveRoot $root -Config $config -ThreadsArg $Threads -MemArg $resolvedMem -EnableHash:$Hash
+            $res = Invoke-BenchmarkForRef -Ref $ref -Pack $pack -WorktreeRoot $tmpWorktreeRoot -ActiveRoot $root -Config $config -ThreadsArg $Threads -MemArg $resolvedMem -EnableHash:$Hash -EnableCacheStats:$CacheStats
 
             $rows.Add([pscustomobject]@{
                 round = $i
@@ -342,7 +345,8 @@ $targetHitStats = Get-Stats -Values $targetHitRates
 $deltaAvgPct = Get-DeltaPct -Baseline $baselineStats.avg -Target $targetStats.avg
 $deltaMedianPct = Get-DeltaPct -Baseline $baselineStats.median -Target $targetStats.median
 $deltaStddevPct = Get-DeltaPct -Baseline $baselineStats.stddev -Target $targetStats.stddev
-$deltaHitMedianPct = Get-DeltaPct -Baseline $baselineHitStats.median -Target $targetHitStats.median
+$deltaHitMedianPct = if ($baselineHitStats.median -eq 0.0) { $null } else { Get-DeltaPct -Baseline $baselineHitStats.median -Target $targetHitStats.median }
+$deltaHitMedianAbs = $targetHitStats.median - $baselineHitStats.median
 
 $outDir = Split-Path -Parent $OutJson
 if ($outDir -and -not (Test-Path $outDir)) {
@@ -356,8 +360,9 @@ $summary = [pscustomobject]@{
         runs = $Runs
         order = "ABBA"
         threads = $Threads
-        mem = $Mem
+        mem = $resolvedMem
         hash = [bool]$Hash
+        cache_stats = [bool]$CacheStats
         baseline_ref = $BaselineRef
         target_ref = $TargetRef
         current_head = $headRef
@@ -376,7 +381,8 @@ $summary = [pscustomobject]@{
         elapsed_avg_delta_pct = [Math]::Round($deltaAvgPct, 6)
         elapsed_median_delta_pct = [Math]::Round($deltaMedianPct, 6)
         elapsed_stddev_delta_pct = [Math]::Round($deltaStddevPct, 6)
-        cache_hit_rate_median_delta_pct = [Math]::Round($deltaHitMedianPct, 6)
+        cache_hit_rate_median_abs_delta = [Math]::Round($deltaHitMedianAbs, 6)
+        cache_hit_rate_median_delta_pct = if ($null -eq $deltaHitMedianPct) { $null } else { [Math]::Round($deltaHitMedianPct, 6) }
         interpretation = "negative elapsed delta means target faster"
     }
     samples = $rows
@@ -398,6 +404,11 @@ Write-Host "  delta median            : $([Math]::Round($deltaMedianPct, 3)) %"
 Write-Host "  delta stddev            : $([Math]::Round($deltaStddevPct, 3)) %"
 Write-Host "  baseline hit median     : $($baselineHitStats.median)"
 Write-Host "  target hit median       : $($targetHitStats.median)"
-Write-Host "  hit-rate median delta   : $([Math]::Round($deltaHitMedianPct, 3)) %"
+Write-Host "  hit-rate median abs     : $([Math]::Round($deltaHitMedianAbs, 6))"
+if ($null -eq $deltaHitMedianPct) {
+    Write-Host "  hit-rate median delta   : N/A"
+} else {
+    Write-Host "  hit-rate median delta   : $([Math]::Round($deltaHitMedianPct, 3)) %"
+}
 Write-Host "  json output             : $OutJson"
 Write-Host "  csv output              : $OutCsv"

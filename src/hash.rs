@@ -182,13 +182,24 @@ impl ObjectHash {
         let type_bytes = object_type
             .to_bytes()
             .expect("from_type_and_data called with a pack delta type");
-        let len = data.len().to_string();
+        let mut len_buf = [0u8; 20];
+        let mut len = data.len();
+        let mut pos = len_buf.len();
+        loop {
+            pos -= 1;
+            len_buf[pos] = b'0' + (len % 10) as u8;
+            len /= 10;
+            if len == 0 {
+                break;
+            }
+        }
+        let len_bytes = &len_buf[pos..];
         match get_hash_kind() {
             HashKind::Sha1 => {
                 let mut hash = sha1::Sha1::new();
                 hash.update(type_bytes);
                 hash.update(b" ");
-                hash.update(len.as_bytes());
+                hash.update(len_bytes);
                 hash.update(b"\0");
                 hash.update(data);
                 let bytes: [u8; 20] = hash.finalize().into();
@@ -198,7 +209,7 @@ impl ObjectHash {
                 let mut hash = sha2::Sha256::new();
                 hash.update(type_bytes);
                 hash.update(b" ");
-                hash.update(len.as_bytes());
+                hash.update(len_bytes);
                 hash.update(b"\0");
                 hash.update(data);
                 let bytes: [u8; 32] = hash.finalize().into();
