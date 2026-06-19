@@ -208,9 +208,10 @@ impl ObjectTrait for Commit {
             Signature::from_data(commit[..commit.find_byte(0x0a).unwrap()].to_vec()).unwrap();
 
         // The rest is the message
-        let message = unsafe {
-            String::from_utf8_unchecked(commit[commit.find_byte(0x0a).unwrap() + 1..].to_vec())
-        };
+        let message = String::from_utf8(commit[commit.find_byte(0x0a).unwrap() + 1..].to_vec())
+            .map_err(|e| {
+                GitError::InvalidObjectInfo(format!("Invalid commit message utf-8: {e}"))
+            })?;
         Ok(Commit {
             id: hash,
             tree_id,
