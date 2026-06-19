@@ -513,7 +513,8 @@ impl Pack {
                                     // It will be more readable, but the performance will be slightly reduced
                                     params.waitlist.insert_offset(base_offset, obj);
                                     // Second check: prevent that the base_obj thread has finished before the waitlist insert
-                                    if let Some(base_obj) = params.caches.get_by_offset(base_offset) {
+                                    if let Some(base_obj) = params.caches.get_by_offset(base_offset)
+                                    {
                                         Self::process_waitlist(params, base_obj);
                                     }
                                 }

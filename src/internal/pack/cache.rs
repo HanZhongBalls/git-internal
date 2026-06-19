@@ -6,7 +6,7 @@ use std::{
     path::{Path, PathBuf},
     sync::{
         Arc, Mutex, Once,
-        atomic::{AtomicBool, AtomicUsize, Ordering},
+        atomic::{AtomicBool, Ordering},
     },
     thread::sleep,
 };
@@ -26,7 +26,11 @@ use crate::{
 /// are ignored instead of causing deserialization errors.
 const CACHE_LAYOUT_VERSION: &str = "rkyv-v1";
 
+#[cfg(feature = "bench_cache_stats")]
+use std::sync::atomic::AtomicUsize;
+
 /// Runtime cache counters used by benchmark scripts.
+#[cfg(feature = "bench_cache_stats")]
 #[derive(Debug, Clone, Copy)]
 pub struct CacheStats {
     pub try_get_calls: usize,
@@ -73,18 +77,24 @@ pub struct Caches {
     path_prefixes: [Once; 256],
     pool: Arc<ThreadPool>,
     complete_signal: Arc<AtomicBool>,
+    #[cfg(feature = "bench_cache_stats")]
     try_get_calls: AtomicUsize,
+    #[cfg(feature = "bench_cache_stats")]
     try_get_hits: AtomicUsize,
+    #[cfg(feature = "bench_cache_stats")]
     disk_fallbacks: AtomicUsize,
+    #[cfg(feature = "bench_cache_stats")]
     lookup_misses: AtomicUsize,
 }
 
 impl Caches {
     /// only get object from memory, not from tmp file
     fn try_get(&self, hash: ObjectHash) -> Option<Arc<CacheObject>> {
+        #[cfg(feature = "bench_cache_stats")]
         self.try_get_calls.fetch_add(1, Ordering::Relaxed);
         let mut map = self.lru_cache.lock().unwrap();
         let result = map.get(&hash).map(|x| x.data.clone());
+        #[cfg(feature = "bench_cache_stats")]
         if result.is_some() {
             self.try_get_hits.fetch_add(1, Ordering::Relaxed);
         }
@@ -94,6 +104,7 @@ impl Caches {
     /// !IMPORTANT: because of the process of pack, the file must be written / be writing before, so it won't be dead lock
     /// fall back to temp to get item. **invoker should ensure the hash is in the cache, or it will block forever**
     fn get_fallback(&self, hash: ObjectHash) -> io::Result<Arc<CacheObject>> {
+        #[cfg(feature = "bench_cache_stats")]
         self.disk_fallbacks.fetch_add(1, Ordering::Relaxed);
         let path = self.generate_temp_path(&self.tmp_path, hash);
         // read from tmp file
@@ -156,6 +167,7 @@ impl Caches {
     }
 
     /// Snapshot cache counters for benchmark reporting.
+    #[cfg(feature = "bench_cache_stats")]
     pub fn stats(&self) -> CacheStats {
         CacheStats {
             try_get_calls: self.try_get_calls.load(Ordering::Relaxed),
@@ -243,9 +255,13 @@ impl _Cache for Caches {
             path_prefixes: [const { Once::new() }; 256],
             pool: Arc::new(ThreadPool::new(thread_num)),
             complete_signal: Arc::new(AtomicBool::new(false)),
+            #[cfg(feature = "bench_cache_stats")]
             try_get_calls: AtomicUsize::new(0),
+            #[cfg(feature = "bench_cache_stats")]
             try_get_hits: AtomicUsize::new(0),
+            #[cfg(feature = "bench_cache_stats")]
             disk_fallbacks: AtomicUsize::new(0),
+            #[cfg(feature = "bench_cache_stats")]
             lookup_misses: AtomicUsize::new(0),
         }
     }
@@ -298,6 +314,7 @@ impl _Cache for Caches {
                 }
             }
         } else {
+            #[cfg(feature = "bench_cache_stats")]
             self.lookup_misses.fetch_add(1, Ordering::Relaxed);
             None
         }

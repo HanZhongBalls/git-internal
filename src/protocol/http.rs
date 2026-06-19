@@ -3,13 +3,13 @@
 
 use std::collections::HashMap;
 
+use bytes::Bytes;
 /// HTTP transport adapter for Git protocol
 ///
 /// This module provides HTTP-specific handling for Git smart protocol operations.
 /// It's a thin wrapper around the core GitProtocol that handles HTTP-specific
 /// request/response formatting and uses the utility functions for proper HTTP handling.
 use serde::Deserialize;
-use bytes::Bytes;
 
 use super::{
     core::{AuthenticationService, GitProtocol, RepositoryAccess},

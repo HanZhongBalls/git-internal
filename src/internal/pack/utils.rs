@@ -266,7 +266,7 @@ pub fn read_delta_object_size<R: Read>(stream: &mut R) -> io::Result<(usize, usi
 /// Calculate the SHA1 hash of the given object.
 /// <br> "`<type> <size>\0<content>`"
 /// <br> data: The decompressed content of the object
-pub fn calculate_object_hash(obj_type: ObjectType, data: &Vec<u8>) -> ObjectHash {
+pub fn calculate_object_hash(obj_type: ObjectType, data: &[u8]) -> ObjectHash {
     let type_bytes = obj_type
         .to_bytes()
         .expect("calculate_object_hash called with a delta type that has no loose-object header");

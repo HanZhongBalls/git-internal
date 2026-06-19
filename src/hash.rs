@@ -179,13 +179,32 @@ impl ObjectHash {
     }
     /// Create ObjectHash from object type and data
     pub fn from_type_and_data(object_type: ObjectType, data: &[u8]) -> ObjectHash {
-        let mut d: Vec<u8> = Vec::new();
-        d.extend(object_type.to_data().unwrap());
-        d.push(b' ');
-        d.extend(data.len().to_string().as_bytes());
-        d.push(b'\x00');
-        d.extend(data);
-        ObjectHash::new(&d)
+        let type_bytes = object_type
+            .to_bytes()
+            .expect("from_type_and_data called with a pack delta type");
+        let len = data.len().to_string();
+        match get_hash_kind() {
+            HashKind::Sha1 => {
+                let mut hash = sha1::Sha1::new();
+                hash.update(type_bytes);
+                hash.update(b" ");
+                hash.update(len.as_bytes());
+                hash.update(b"\0");
+                hash.update(data);
+                let bytes: [u8; 20] = hash.finalize().into();
+                ObjectHash::Sha1(bytes)
+            }
+            HashKind::Sha256 => {
+                let mut hash = sha2::Sha256::new();
+                hash.update(type_bytes);
+                hash.update(b" ");
+                hash.update(len.as_bytes());
+                hash.update(b"\0");
+                hash.update(data);
+                let bytes: [u8; 32] = hash.finalize().into();
+                ObjectHash::Sha256(bytes)
+            }
+        }
     }
     /// Create `ObjectHash` from raw bytes matching the current hash size.
     pub fn from_bytes(bytes: &[u8]) -> Result<ObjectHash, String> {

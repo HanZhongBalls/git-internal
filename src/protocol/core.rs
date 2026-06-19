@@ -243,7 +243,11 @@ impl<R: RepositoryAccess, A: AuthenticationService> GitProtocol<R, A> {
             _ => return Err(ProtocolError::invalid_service(service)),
         };
 
-        Ok(self.smart_protocol.git_info_refs(service_type).await?.freeze())
+        Ok(self
+            .smart_protocol
+            .git_info_refs(service_type)
+            .await?
+            .freeze())
     }
 
     /// Handle git-upload-pack request (for clone/fetch)
