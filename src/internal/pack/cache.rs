@@ -255,15 +255,12 @@ impl _Cache for Caches {
     fn get_by_hash(&self, hash: ObjectHash) -> Option<Arc<CacheObject>> {
         // check if the hash is in the cache( lru or tmp file)
         if self.hash_set.contains(&hash) {
-            match self.try_get(hash) {
-                Some(x) => Some(x),
-                None => {
-                    if self.mem_size.is_none() {
-                        panic!("should not be here when mem_size is not set")
-                    }
-                    self.get_fallback(hash).ok()
+            self.try_get(hash).or_else(|| {
+                if self.mem_size.is_none() {
+                    panic!("should not be here when mem_size is not set")
                 }
-            }
+                self.get_fallback(hash).ok()
+            })
         } else {
             None
         }

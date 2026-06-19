@@ -453,6 +453,13 @@ impl Pack {
         tracing::info!("The pack file has {} objects", self.number);
         // Pre-size the waitlist now that we know the object count.
         self.waitlist = Arc::new(Waitlist::with_capacity(self.number));
+        let shared_params = Arc::new(SharedParams {
+            pool: self.pool.clone(),
+            waitlist: self.waitlist.clone(),
+            caches: self.caches.clone(),
+            cache_objs_mem_size: self.cache_objs_mem.clone(),
+            callback: callback.clone(),
+        });
 
         let mut offset: usize = 12;
         let mut i = 0;
@@ -490,13 +497,7 @@ impl Pack {
                     obj.set_mem_recorder(self.cache_objs_mem.clone());
                     obj.record_mem_size();
 
-                    let params = Arc::new(SharedParams {
-                        pool: self.pool.clone(),
-                        waitlist: self.waitlist.clone(),
-                        caches: self.caches.clone(),
-                        cache_objs_mem_size: self.cache_objs_mem.clone(),
-                        callback: callback.clone(),
-                    });
+                    let params = shared_params.clone();
                     let kind = get_hash_kind();
                     self.pool.execute(move || {
                         set_hash_kind(kind);

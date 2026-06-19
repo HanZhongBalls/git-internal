@@ -109,7 +109,7 @@ fn canonicalize_json(value: &mut Value) {
         }
         Value::Object(map) => {
             let mut entries: Vec<(String, Value)> = std::mem::take(map).into_iter().collect();
-            entries.sort_by(|(a, _), (b, _)| a.cmp(b));
+            entries.sort_by_key(|(key, _)| key.clone());
             let mut sorted = serde_json::Map::with_capacity(entries.len());
             for (key, mut value) in entries {
                 canonicalize_json(&mut value);
