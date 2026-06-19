@@ -490,54 +490,51 @@ impl Pack {
                     }
                 }
             }
-            let r: Result<Option<CacheObject>, GitError> =
-                Pack::decode_pack_object(&mut reader, &mut offset);
-            match r {
-                Ok(Some(mut obj)) => {
-                    obj.set_mem_recorder(self.cache_objs_mem.clone());
-                    obj.record_mem_size();
-
-                    let params = shared_params.clone();
-                    let kind = get_hash_kind();
-                    self.pool.execute(move || {
-                        set_hash_kind(kind);
-                        match obj.info {
-                            CacheObjectInfo::BaseObject(_, _) => {
-                                Self::cache_obj_and_process_waitlist(params, obj);
-                            }
-                            CacheObjectInfo::OffsetDelta(base_offset, _)
-                            | CacheObjectInfo::OffsetZstdelta(base_offset, _) => {
-                                if let Some(base_obj) = params.caches.get_by_offset(base_offset) {
-                                    Self::process_delta(params, obj, base_obj);
-                                } else {
-                                    // You can delete this 'if' block ↑, because there are Second check in 'else'
-                                    // It will be more readable, but the performance will be slightly reduced
-                                    params.waitlist.insert_offset(base_offset, obj);
-                                    // Second check: prevent that the base_obj thread has finished before the waitlist insert
-                                    if let Some(base_obj) = params.caches.get_by_offset(base_offset)
-                                    {
-                                        Self::process_waitlist(params, base_obj);
-                                    }
-                                }
-                            }
-                            CacheObjectInfo::HashDelta(base_ref, _) => {
-                                if let Some(base_obj) = params.caches.get_by_hash(base_ref) {
-                                    Self::process_delta(params, obj, base_obj);
-                                } else {
-                                    params.waitlist.insert_ref(base_ref, obj);
-                                    if let Some(base_obj) = params.caches.get_by_hash(base_ref) {
-                                        Self::process_waitlist(params, base_obj);
-                                    }
-                                }
-                            }
-                        }
-                    });
-                }
-                Ok(None) => {}
+            let obj = match Pack::decode_pack_object(&mut reader, &mut offset) {
+                Ok(obj) => obj,
                 Err(e) => {
                     self.abort_decode();
                     return Err(e);
                 }
+            };
+            if let Some(mut obj) = obj {
+                obj.set_mem_recorder(self.cache_objs_mem.clone());
+                obj.record_mem_size();
+
+                let params = shared_params.clone();
+                let kind = get_hash_kind();
+                self.pool.execute(move || {
+                    set_hash_kind(kind);
+                    match obj.info {
+                        CacheObjectInfo::BaseObject(_, _) => {
+                            Self::cache_obj_and_process_waitlist(params, obj);
+                        }
+                        CacheObjectInfo::OffsetDelta(base_offset, _)
+                        | CacheObjectInfo::OffsetZstdelta(base_offset, _) => {
+                            if let Some(base_obj) = params.caches.get_by_offset(base_offset) {
+                                Self::process_delta(params, obj, base_obj);
+                            } else {
+                                // You can delete this 'if' block ↑, because there are Second check in 'else'
+                                // It will be more readable, but the performance will be slightly reduced
+                                params.waitlist.insert_offset(base_offset, obj);
+                                // Second check: prevent that the base_obj thread has finished before the waitlist insert
+                                if let Some(base_obj) = params.caches.get_by_offset(base_offset) {
+                                    Self::process_waitlist(params, base_obj);
+                                }
+                            }
+                        }
+                        CacheObjectInfo::HashDelta(base_ref, _) => {
+                            if let Some(base_obj) = params.caches.get_by_hash(base_ref) {
+                                Self::process_delta(params, obj, base_obj);
+                            } else {
+                                params.waitlist.insert_ref(base_ref, obj);
+                                if let Some(base_obj) = params.caches.get_by_hash(base_ref) {
+                                    Self::process_waitlist(params, base_obj);
+                                }
+                            }
+                        }
+                    }
+                });
             }
             i += 1;
         }
