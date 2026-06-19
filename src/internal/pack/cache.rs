@@ -6,7 +6,7 @@ use std::{
     path::{Path, PathBuf},
     sync::{
         Arc, Mutex, Once,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     thread::sleep,
 };
@@ -25,6 +25,15 @@ use crate::{
 /// incompatible serialization format (for example the previous bincode layout)
 /// are ignored instead of causing deserialization errors.
 const CACHE_LAYOUT_VERSION: &str = "rkyv-v1";
+
+/// Runtime cache counters used by benchmark scripts.
+#[derive(Debug, Clone, Copy)]
+pub struct CacheStats {
+    pub try_get_calls: usize,
+    pub try_get_hits: usize,
+    pub disk_fallbacks: usize,
+    pub lookup_misses: usize,
+}
 
 /// Trait defining the interface for a multi-tier cache system.
 /// This cache supports insertion and retrieval of objects by both offset and hash,
@@ -64,18 +73,28 @@ pub struct Caches {
     path_prefixes: [Once; 256],
     pool: Arc<ThreadPool>,
     complete_signal: Arc<AtomicBool>,
+    try_get_calls: AtomicUsize,
+    try_get_hits: AtomicUsize,
+    disk_fallbacks: AtomicUsize,
+    lookup_misses: AtomicUsize,
 }
 
 impl Caches {
     /// only get object from memory, not from tmp file
     fn try_get(&self, hash: ObjectHash) -> Option<Arc<CacheObject>> {
+        self.try_get_calls.fetch_add(1, Ordering::Relaxed);
         let mut map = self.lru_cache.lock().unwrap();
-        map.get(&hash).map(|x| x.data.clone())
+        let result = map.get(&hash).map(|x| x.data.clone());
+        if result.is_some() {
+            self.try_get_hits.fetch_add(1, Ordering::Relaxed);
+        }
+        result
     }
 
     /// !IMPORTANT: because of the process of pack, the file must be written / be writing before, so it won't be dead lock
     /// fall back to temp to get item. **invoker should ensure the hash is in the cache, or it will block forever**
     fn get_fallback(&self, hash: ObjectHash) -> io::Result<Arc<CacheObject>> {
+        self.disk_fallbacks.fetch_add(1, Ordering::Relaxed);
         let path = self.generate_temp_path(&self.tmp_path, hash);
         // read from tmp file
         let obj = {
@@ -134,6 +153,16 @@ impl Caches {
     /// number of queued tasks in the thread pool
     pub fn queued_tasks(&self) -> usize {
         self.pool.queued_count()
+    }
+
+    /// Snapshot cache counters for benchmark reporting.
+    pub fn stats(&self) -> CacheStats {
+        CacheStats {
+            try_get_calls: self.try_get_calls.load(Ordering::Relaxed),
+            try_get_hits: self.try_get_hits.load(Ordering::Relaxed),
+            disk_fallbacks: self.disk_fallbacks.load(Ordering::Relaxed),
+            lookup_misses: self.lookup_misses.load(Ordering::Relaxed),
+        }
     }
 
     /// memory used by the index (exclude lru_cache which is contained in CacheObject::get_mem_size())
@@ -214,6 +243,10 @@ impl _Cache for Caches {
             path_prefixes: [const { Once::new() }; 256],
             pool: Arc::new(ThreadPool::new(thread_num)),
             complete_signal: Arc::new(AtomicBool::new(false)),
+            try_get_calls: AtomicUsize::new(0),
+            try_get_hits: AtomicUsize::new(0),
+            disk_fallbacks: AtomicUsize::new(0),
+            lookup_misses: AtomicUsize::new(0),
         }
     }
 
@@ -246,7 +279,7 @@ impl _Cache for Caches {
     /// get object by offset, from memory or tmp file
     fn get_by_offset(&self, offset: usize) -> Option<Arc<CacheObject>> {
         match self.map_offset.get(&offset) {
-            Some(x) => self.get_by_hash(*x),
+            Some(hash) => self.get_by_hash(*hash),
             None => None,
         }
     }
@@ -265,6 +298,7 @@ impl _Cache for Caches {
                 }
             }
         } else {
+            self.lookup_misses.fetch_add(1, Ordering::Relaxed);
             None
         }
     }

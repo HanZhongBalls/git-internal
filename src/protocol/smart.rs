@@ -288,6 +288,7 @@ where
         while let Some(chunk_result) = futures::StreamExt::next(&mut stream).await {
             let chunk = chunk_result
                 .map_err(|e| ProtocolError::invalid_request(&format!("Stream error: {e}")))?;
+            request_data.reserve(chunk.len());
             request_data.extend_from_slice(&chunk);
         }
 

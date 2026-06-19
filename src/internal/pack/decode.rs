@@ -129,7 +129,7 @@ impl Pack {
             signature: ObjectHash::default(),
             objects: Vec::new(),
             pool: Arc::new(ThreadPool::new(thread_num)),
-            waitlist: Arc::new(Waitlist::new()),
+            waitlist: Arc::new(Waitlist::new()), // resized to object_num after header is read
             caches: Arc::new(Caches::new(cache_mem_size, temp_path, thread_num)),
             mem_limit,
             cache_objs_mem: Arc::new(AtomicUsize::default()),
@@ -438,7 +438,8 @@ impl Pack {
         let callback = Arc::new(callback);
 
         let caches = self.caches.clone();
-        let mut reader = Wrapper::new(io::BufReader::new(pack));
+        // 256 KB read buffer: sequential large-file reads benefit significantly.
+        let mut reader = Wrapper::new(io::BufReader::with_capacity(256 * 1024, pack));
 
         let result = Pack::check_header(&mut reader);
         match result {
@@ -450,6 +451,9 @@ impl Pack {
             }
         }
         tracing::info!("The pack file has {} objects", self.number);
+        // Pre-size the waitlist now that we know the object count.
+        self.waitlist = Arc::new(Waitlist::with_capacity(self.number));
+
         let mut offset: usize = 12;
         let mut i = 0;
         while i < self.number {
@@ -463,13 +467,21 @@ impl Pack {
             }
             // 3 parts: Waitlist + TheadPool + Caches
             // hardcode the limit of the tasks of threads_pool queue, to limit memory
-            while self.pool.queued_count() > 2000
-                || self
-                    .mem_limit
-                    .map(|limit| self.memory_used() > limit)
-                    .unwrap_or(false)
             {
-                thread::yield_now();
+                let mut spin = 0u32;
+                while self.pool.queued_count() > 2000
+                    || self
+                        .mem_limit
+                        .map(|limit| self.memory_used() > limit)
+                        .unwrap_or(false)
+                {
+                    spin += 1;
+                    if spin < 16 {
+                        thread::yield_now();
+                    } else {
+                        thread::sleep(std::time::Duration::from_micros(100));
+                    }
+                }
             }
             let r: Result<Option<CacheObject>, GitError> =
                 Pack::decode_pack_object(&mut reader, &mut offset);
@@ -478,7 +490,6 @@ impl Pack {
                     obj.set_mem_recorder(self.cache_objs_mem.clone());
                     obj.record_mem_size();
 
-                    // Wrapper of Arc Params, for convenience to pass
                     let params = Arc::new(SharedParams {
                         pool: self.pool.clone(),
                         waitlist: self.waitlist.clone(),
@@ -486,9 +497,6 @@ impl Pack {
                         cache_objs_mem_size: self.cache_objs_mem.clone(),
                         callback: callback.clone(),
                     });
-
-                    let caches = caches.clone();
-                    let waitlist = self.waitlist.clone();
                     let kind = get_hash_kind();
                     self.pool.execute(move || {
                         set_hash_kind(kind);
@@ -498,24 +506,24 @@ impl Pack {
                             }
                             CacheObjectInfo::OffsetDelta(base_offset, _)
                             | CacheObjectInfo::OffsetZstdelta(base_offset, _) => {
-                                if let Some(base_obj) = caches.get_by_offset(base_offset) {
+                                if let Some(base_obj) = params.caches.get_by_offset(base_offset) {
                                     Self::process_delta(params, obj, base_obj);
                                 } else {
                                     // You can delete this 'if' block ↑, because there are Second check in 'else'
                                     // It will be more readable, but the performance will be slightly reduced
-                                    waitlist.insert_offset(base_offset, obj);
+                                    params.waitlist.insert_offset(base_offset, obj);
                                     // Second check: prevent that the base_obj thread has finished before the waitlist insert
-                                    if let Some(base_obj) = caches.get_by_offset(base_offset) {
+                                    if let Some(base_obj) = params.caches.get_by_offset(base_offset) {
                                         Self::process_waitlist(params, base_obj);
                                     }
                                 }
                             }
                             CacheObjectInfo::HashDelta(base_ref, _) => {
-                                if let Some(base_obj) = caches.get_by_hash(base_ref) {
+                                if let Some(base_obj) = params.caches.get_by_hash(base_ref) {
                                     Self::process_delta(params, obj, base_obj);
                                 } else {
-                                    waitlist.insert_ref(base_ref, obj);
-                                    if let Some(base_obj) = caches.get_by_hash(base_ref) {
+                                    params.waitlist.insert_ref(base_ref, obj);
+                                    if let Some(base_obj) = params.caches.get_by_hash(base_ref) {
                                         Self::process_waitlist(params, base_obj);
                                     }
                                 }
@@ -754,10 +762,11 @@ impl Pack {
                     );
                 }
 
-                // Append the provided bytes
-                let mut data = vec![0; instruction as usize];
-                stream.read_exact(&mut data).unwrap();
-                result.extend_from_slice(&data);
+                // Append the provided bytes directly into result; avoid temp allocation.
+                let prev_len = result.len();
+                let count = instruction as usize;
+                result.resize(prev_len + count, 0);
+                stream.read_exact(&mut result[prev_len..]).unwrap();
             } else {
                 // Copy instruction
                 // +----------+---------+---------+---------+---------+-------+-------+-------+

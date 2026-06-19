@@ -103,7 +103,8 @@ where
 
         // Create a Pack instance for decoding
         let mut pack = Pack::new(None, None, None, true);
-        let mut cursor = Cursor::new(pack_data.to_vec());
+        // Avoid a full clone (`Bytes` -> `Vec<u8>`) before decoding.
+        let mut cursor = Cursor::new(pack_data);
 
         // Decode the pack and collect entries
         pack.decode(

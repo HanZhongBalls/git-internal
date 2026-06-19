@@ -1,0 +1,13 @@
+﻿{
+    "run":  1,
+    "ref":  "5747f2c",
+    "resolved_ref":  "5747f2ced933d07e886407c96965fb16e24f2631",
+    "elapsed_ms":  132260,
+    "objects_by_pack":  76863,
+    "objects_by_callback":  76863,
+    "signature":  "5b1a0dc73eee95106ee30604c51c08027430c4ca",
+    "pack_path":  "E:\\Programme\\NJU\\Rust\\rk8s\\.git\\objects\\pack\\pack-5b1a0dc73eee95106ee30604c51c08027430c4ca.pack",
+    "rk8s_commit":  "18169f282",
+    "threads":  4,
+    "mem_limit_mb":  512
+}

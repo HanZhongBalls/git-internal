@@ -20,6 +20,17 @@ impl Waitlist {
         Self::default()
     }
 
+    /// Create a Waitlist pre-allocated for approximately `object_num` entries.
+    /// Reduces DashMap rehashing when the number of delta objects is large.
+    pub fn with_capacity(object_num: usize) -> Self {
+        // Delta objects are typically 30–60 % of a pack; reserve generously.
+        let cap = (object_num / 2).max(16);
+        Waitlist {
+            map_offset: DashMap::with_capacity(cap),
+            map_ref: DashMap::with_capacity(cap),
+        }
+    }
+
     /// Insert an object into the waitlist by its pack offset or object hash.
     pub fn insert_offset(&self, offset: usize, obj: CacheObject) {
         self.map_offset.entry(offset).or_default().push(obj);

@@ -125,4 +125,20 @@ fn main() {
     println!("RESULT objects_by_pack={}", pack.number);
     println!("RESULT objects_by_callback={callback_seen}");
     println!("RESULT signature={}", pack.signature);
+
+    #[cfg(feature = "bench_cache_stats")]
+    {
+        let cache_stats = pack.caches.stats();
+        let cache_hit_rate = if cache_stats.try_get_calls == 0 {
+            0.0
+        } else {
+            cache_stats.try_get_hits as f64 / cache_stats.try_get_calls as f64
+        };
+
+        println!("RESULT cache_try_get_calls={}", cache_stats.try_get_calls);
+        println!("RESULT cache_try_get_hits={}", cache_stats.try_get_hits);
+        println!("RESULT cache_lookup_misses={}", cache_stats.lookup_misses);
+        println!("RESULT cache_disk_fallbacks={}", cache_stats.disk_fallbacks);
+        println!("RESULT cache_hit_rate={cache_hit_rate:.6}");
+    }
 }

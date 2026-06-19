@@ -2,6 +2,8 @@
 //! helpers for authenticating connections, parsing SSH commands, and serving upload/receive-pack
 //! requests over interactive channels.
 
+use bytes::Bytes;
+
 use super::{
     core::{AuthenticationService, GitProtocol, RepositoryAccess},
     types::{ProtocolError, ProtocolStream},
@@ -33,7 +35,7 @@ impl<R: RepositoryAccess, A: AuthenticationService> SshGitHandler<R, A> {
     /// Handle git-upload-pack command (for clone/fetch)
     pub async fn handle_upload_pack(
         &mut self,
-        request_data: &[u8],
+        request_data: Bytes,
     ) -> Result<ProtocolStream, ProtocolError> {
         self.protocol.upload_pack(request_data).await
     }
@@ -47,7 +49,7 @@ impl<R: RepositoryAccess, A: AuthenticationService> SshGitHandler<R, A> {
     }
 
     /// Handle info/refs request for SSH
-    pub async fn handle_info_refs(&mut self, service: &str) -> Result<Vec<u8>, ProtocolError> {
+    pub async fn handle_info_refs(&mut self, service: &str) -> Result<Bytes, ProtocolError> {
         self.protocol.info_refs(service).await
     }
 }

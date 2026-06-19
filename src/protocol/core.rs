@@ -236,29 +236,26 @@ impl<R: RepositoryAccess, A: AuthenticationService> GitProtocol<R, A> {
     }
 
     /// Handle git info-refs request
-    pub async fn info_refs(&self, service: &str) -> Result<Vec<u8>, ProtocolError> {
+    pub async fn info_refs(&self, service: &str) -> Result<Bytes, ProtocolError> {
         let service_type = match service {
             "git-upload-pack" => ServiceType::UploadPack,
             "git-receive-pack" => ServiceType::ReceivePack,
             _ => return Err(ProtocolError::invalid_service(service)),
         };
 
-        let bytes = self.smart_protocol.git_info_refs(service_type).await?;
-        Ok(bytes.to_vec())
+        Ok(self.smart_protocol.git_info_refs(service_type).await?.freeze())
     }
 
     /// Handle git-upload-pack request (for clone/fetch)
     pub async fn upload_pack(
         &mut self,
-        request_data: &[u8],
+        request_data: Bytes,
     ) -> Result<ProtocolStream, ProtocolError> {
         const SIDE_BAND_PACKET_LEN: usize = 1000;
         const SIDE_BAND_64K_PACKET_LEN: usize = 65520;
         const SIDE_BAND_HEADER_LEN: usize = 5; // 4-byte length + 1-byte band
 
-        let request_bytes = bytes::Bytes::from(request_data.to_vec());
-        let (pack_stream, protocol_buf) =
-            self.smart_protocol.git_upload_pack(request_bytes).await?;
+        let (pack_stream, protocol_buf) = self.smart_protocol.git_upload_pack(request_data).await?;
         let ack_bytes = protocol_buf.freeze();
 
         let ack_stream: ProtocolStream = if ack_bytes.is_empty() {
@@ -578,7 +575,10 @@ mod tests {
         utils::add_pkt_line_string(&mut request, format!("want {}\n", commit.id));
         utils::add_pkt_line_string(&mut request, "done\n".to_string());
 
-        let mut stream = proto.upload_pack(&request).await.expect("upload-pack");
+        let mut stream = proto
+            .upload_pack(request.freeze())
+            .await
+            .expect("upload-pack");
         let mut out = BytesMut::new();
         while let Some(chunk) = stream.next().await {
             out.extend_from_slice(&chunk.expect("stream chunk"));
@@ -604,7 +604,10 @@ mod tests {
         utils::add_pkt_line_string(&mut request, format!("want {} side-band-64k\n", commit.id));
         utils::add_pkt_line_string(&mut request, "done\n".to_string());
 
-        let mut stream = proto.upload_pack(&request).await.expect("upload-pack");
+        let mut stream = proto
+            .upload_pack(request.freeze())
+            .await
+            .expect("upload-pack");
         let mut out = BytesMut::new();
         while let Some(chunk) = stream.next().await {
             out.extend_from_slice(&chunk.expect("stream chunk"));
@@ -629,7 +632,7 @@ mod tests {
     async fn info_refs_includes_refs_and_caps() {
         let proto = make_protocol();
         let bytes = proto.info_refs("git-upload-pack").await.expect("info_refs");
-        let text = String::from_utf8(bytes).expect("utf8");
+        let text = String::from_utf8(bytes.to_vec()).expect("utf8");
         assert!(text.contains("refs/heads/main"));
         assert!(text.contains("capabilities"));
         assert!(text.contains("object-format"));

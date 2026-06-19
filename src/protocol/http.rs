@@ -9,6 +9,7 @@ use std::collections::HashMap;
 /// It's a thin wrapper around the core GitProtocol that handles HTTP-specific
 /// request/response formatting and uses the utility functions for proper HTTP handling.
 use serde::Deserialize;
+use bytes::Bytes;
 
 use super::{
     core::{AuthenticationService, GitProtocol, RepositoryAccess},
@@ -45,7 +46,7 @@ impl<R: RepositoryAccess, A: AuthenticationService> HttpGitHandler<R, A> {
         &mut self,
         request_path: &str,
         query: &str,
-    ) -> Result<(Vec<u8>, &'static str), ProtocolError> {
+    ) -> Result<(Bytes, &'static str), ProtocolError> {
         // Validate repository path exists in request
         extract_repo_path(request_path)
             .ok_or_else(|| ProtocolError::InvalidRequest("Invalid repository path".to_string()))?;
@@ -74,7 +75,7 @@ impl<R: RepositoryAccess, A: AuthenticationService> HttpGitHandler<R, A> {
     pub async fn handle_upload_pack(
         &mut self,
         request_path: &str,
-        request_body: &[u8],
+        request_body: Bytes,
     ) -> Result<(ProtocolStream, &'static str), ProtocolError> {
         // Validate repository path exists in request
         extract_repo_path(request_path)
